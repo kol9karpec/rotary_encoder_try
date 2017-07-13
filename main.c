@@ -28,6 +28,7 @@
 void init_encoder_right();
 void init_led();
 void init_pwm_timer();
+void pwm_tick(uint8_t flag);
 
 volatile int presc = 1;
 volatile int flag = 1;
@@ -46,6 +47,14 @@ int main(void) {
 
 
 	return 0;
+}
+
+void pwm_tick(uint8_t flag) {
+	if((flag == 1) && (OCR0A != 0xff)) {
+		OCR0A++;
+	} else if(OCR0A != 0x00) {
+		OCR0A--;
+	}
 }
 
 void init_encoder_right() {
@@ -67,24 +76,10 @@ ISR(PCINT0_vect) { //interrupt to handle encoder rotate
 	int in2_cur = GET_BIT(ENCODER_IN2_PIN,ENCODER_IN2);
 
 	if(in1_cur == in2_cur) {
-		flag = -1;
+		pwm_tick(1);
 	} else {
-		flag = 1;
+		pwm_tick(-1);
 	}
-		if(((OCR0A == 0) && (presc == 1)) || (( OCR0A == 255 ) && (presc == 2))) {
-			flag *= -1;
-		} else if ((flag == 1) && (OCR0A == 255)) {
-			set_presc(presc+flag,&OCR0A,flag);
-			presc += flag;
-		} else if (flag == -1) {
-			if ((((presc == 2)||(presc==3))&&(OCR0A == 31)) || \
-				(((presc == 4)||(presc==5))&&(OCR0A == 63))) {
-				set_presc(presc+flag,&OCR0A,flag);
-				presc += flag;
-			}
-		}
-
-	OCR0A += flag*5;
 }
 
 void init_led() {
