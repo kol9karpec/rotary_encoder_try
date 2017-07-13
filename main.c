@@ -17,12 +17,16 @@
 
 #define ENCODER_IN1 DPIN21
 #define ENCODER_IN2 DPIN20
+#define ENCODER_BUTTON DPIN19
 #define ENCODER_IN1_DDR DDRD
 #define ENCODER_IN2_DDR DDRD
+#define ENCODER_BUTTON_DDR DDRD
+#define ENCODER_BUTTON_PORT PORTD
 #define ENCODER_IN1_PORT PORTD
 #define ENCODER_IN2_PORT PORTD
 #define ENCODER_IN1_PIN PIND
 #define ENCODER_IN2_PIN PIND
+#define ENCODER_BUTTON_PIN PIND
 
 #define BIT(x) (1 << (x))
 #define GET_BIT(r,n) ((r >> n)&1)
@@ -92,7 +96,12 @@ void init_encoder_right() {
 
 	//Enabling interrupt for INT0/Digital pin 21
 	EICRA |= BIT(ISC00) | BIT(ISC01); //Interrupt on rising edge
-	EIMSK |= BIT(INT0);
+	EIMSK |= BIT(INT0) | BIT(INT2);
+
+	//Init button
+	EICRA |= BIT(ISC20) | BIT(ISC21);
+	ENCODER_BUTTON_DDR &= ~(BIT(ENCODER_BUTTON));
+	ENCODER_BUTTON_PORT |= BIT(ENCODER_BUTTON);
 }
 
 ISR(INT0_vect) { //interrupt to handle encoder rotate
@@ -103,15 +112,27 @@ ISR(INT0_vect) { //interrupt to handle encoder rotate
 	char * buff = (char*)(malloc(sizeof(char)*0xff));
 
 	if(in1_cur != in2_cur) {
-		pwm_tick(10);
+		pwm_tick(5);
 	} else {
-		pwm_tick(-10);
+		pwm_tick(-5);
 	}
-	USART0_print(itoa(OCR0A,buff,10));
-	USART0_print("\n");
+	//USART0_print(itoa(OCR0A,buff,10));
 	free(buff);
+	//USART0_print("\n");
 	//_delay_ms(5);
 	sei();
+}
+
+ISR(INT2_vect) {
+	if(GET_BIT(EIMSK,INT0)) {
+		EIMSK &= ~(BIT(INT0));
+		OCR0A = 0;
+	} else {
+		EIMSK |= BIT(INT0);
+		OCR0A = 0xff;
+	}
+	//USART0_print("int2_vect interrupt!\n");
+	_delay_ms(500);
 }
 
 void init_led() {
@@ -131,5 +152,5 @@ void init_pwm_timer() {
 	TCCR0B |= BIT(CS00); //prescaler = 1
 
 	//Output Compare Match value
-	OCR0A = 1;
+	OCR0A = 0;
 }
