@@ -1,3 +1,10 @@
+//Connect encoder as follows:
+//CLK - Digital pin 21
+//DT - Digital pin 20
+//SW - Digital pin 19
+//Ground
+
+
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
