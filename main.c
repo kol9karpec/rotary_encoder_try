@@ -2,6 +2,7 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define LED_BIT 7
 #define LED_DDR DDRB
@@ -29,9 +30,9 @@
 void init_encoder_right();
 void init_led();
 void init_pwm_timer();
-void pwm_tick(uint8_t flag);
+void pwm_tick(int flag);
 void USART0_init(unsigned int baud_rate);
-void USART0_print(unsigned char * data);
+void USART0_print(const char * data);
 
 static volatile int presc = 1;
 static volatile int flag = 1;
@@ -42,6 +43,7 @@ int main(void) {
 	init_encoder_right();
 	init_led();
 	init_pwm_timer();
+	USART0_init(F_CPU/16/(115200-1));
 
 	sei();
 	while(1) {
@@ -52,30 +54,30 @@ int main(void) {
 	return 0;
 }
 
-void USART0_print(unsigned char * data) {
+void USART0_print(const char * data) {
 	uint8_t i=0;
 	uint8_t _strlen = strlen(data);	
 
 	for(;i<_strlen;i++) {
-		while(!GET_BIT(USCR0A,UDRE0));
+		while(!GET_BIT(UCSR0A,UDRE0));
 		UDR0 = data[i];
 	}
 }
 
 
 void USART0_init(unsigned int baud_rate) {
-	unsigned ubrr = F_CPU/16/(baud_rate-1);
+	//unsigned ubrr = F_CPU/16/(baud_rate-1);
 	
-	UBRR0 = ubrr;
+	UBRR0 = baud_rate;
 
 	UCSR0B |= BIT(TXEN0);
 }
 
-void pwm_tick(uint8_t flag) {
-	if((flag == 1) && (OCR0A != 0xff)) {
-		OCR0A++;
-	} else if(OCR0A != 0x00) {
-		OCR0A--;
+void pwm_tick(int flag) {
+	if((flag > 0) && (OCR0A+flag <= 0xff)) {
+		OCR0A+=flag;
+	} else if((flag < 0) && (OCR0A+flag >= 0x00)) {
+		OCR0A+=flag;
 	}
 }
 
@@ -84,9 +86,9 @@ void init_encoder_right() {
 	ENCODER_IN1_DDR &= ~(BIT(ENCODER_IN1));
 	ENCODER_IN2_DDR &= ~(BIT(ENCODER_IN2));
 	
-	//Pullups to '0'
-	ENCODER_IN1_PORT &= ~(BIT(ENCODER_IN1));
-	ENCODER_IN2_PORT &= ~(BIT(ENCODER_IN2));
+	//Pullups to '1'
+	ENCODER_IN1_PORT |= BIT(ENCODER_IN1);
+	ENCODER_IN2_PORT |= BIT(ENCODER_IN2);
 
 	//Enabling interrupt for INT0/Digital pin 21
 	EICRA |= BIT(ISC00) | BIT(ISC01); //Interrupt on rising edge
@@ -94,14 +96,22 @@ void init_encoder_right() {
 }
 
 ISR(INT0_vect) { //interrupt to handle encoder rotate
+	cli();
+
 	int in1_cur = GET_BIT(ENCODER_IN1_PIN,ENCODER_IN1);
 	int in2_cur = GET_BIT(ENCODER_IN2_PIN,ENCODER_IN2);
+	char * buff = (char*)(malloc(sizeof(char)*0xff));
 
-	if(in1_cur == in2_cur) {
-		pwm_tick(1);
+	if(in1_cur != in2_cur) {
+		pwm_tick(10);
 	} else {
-		pwm_tick(-1);
+		pwm_tick(-10);
 	}
+	USART0_print(itoa(OCR0A,buff,10));
+	USART0_print("\n");
+	free(buff);
+	//_delay_ms(5);
+	sei();
 }
 
 void init_led() {
