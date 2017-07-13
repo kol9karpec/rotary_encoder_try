@@ -1,7 +1,6 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
-#include <string.h>
 
 #define LED_BIT 7
 #define LED_DDR DDRB
@@ -30,11 +29,9 @@ void init_encoder_right();
 void init_led();
 void init_pwm_timer();
 void pwm_tick(uint8_t flag);
-void USART0_init(unsigned int baud_rate);
-void USART0_print(unsigned char * data);
 
-static volatile int presc = 1;
-static volatile int flag = 1;
+volatile int presc = 1;
+volatile int flag = 1;
 
 int main(void) {
 	cli();
@@ -50,25 +47,6 @@ int main(void) {
 
 
 	return 0;
-}
-
-void USART0_print(unsigned char * data) {
-	uint8_t i=0;
-	uint8_t _strlen = strlen(data);	
-
-	for(;i<_strlen;i++) {
-		while(!GET_BIT(USCR0A,UDRE0));
-		UDR0 = data[i];
-	}
-}
-
-
-void USART0_init(unsigned int baud_rate) {
-	unsigned ubrr = F_CPU/16/(baud_rate-1);
-	
-	UBRR0 = ubrr;
-
-	UCSR0B |= BIT(TXEN0);
 }
 
 void pwm_tick(uint8_t flag) {
@@ -93,7 +71,7 @@ void init_encoder_right() {
 	EIMSK |= BIT(INT0);
 }
 
-ISR(INT0_vect) { //interrupt to handle encoder rotate
+ISR(PCINT0_vect) { //interrupt to handle encoder rotate
 	int in1_cur = GET_BIT(ENCODER_IN1_PIN,ENCODER_IN1);
 	int in2_cur = GET_BIT(ENCODER_IN2_PIN,ENCODER_IN2);
 
